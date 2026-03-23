@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twilio Call Trigger</title>
+    <style>
+        :root {
+            --primary: #f22f46; /* Twilio Red */
+            --bg: #0d1117;
+            --card-bg: #161b22;
+            --text: #c9d1d9;
+            --input-bg: #0d1117;
+            --border: #30363d;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 450px;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: white;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #response {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            display: none;
+            word-break: break-all;
+        }
+
+        .success { background-color: rgba(43, 194, 83, 0.1); border: 1px solid #2bc253; color: #2bc253; }
+        .error { background-color: rgba(242, 47, 70, 0.1); border: 1px solid #f22f46; color: #f22f46; }
+
+        .loader {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-group">
+            <label>API Server URL (Ngrok or Koyeb)</label>
+            <input type="text" id="api_url" value="https://fanglike-filomena-onwardly.ngrok-free.dev" placeholder="e.g. https://your-app.koyeb.app">
+            <small style="color: #666; font-size: 0.75rem;">Enter your live server address here.</small>
+        </div>
+        <div class="form-group">
+            <label>Optional: Select Audio File (.mp3 / .wav)</label>
+            <input type="file" id="audio_file" accept=".mp3,.wav">
+            <small style="color: #666; font-size: 0.75rem;">Leave empty for Hindi Voice Greeting.</small>
+        </div>
+        <div class="form-group">
+            <label>Twilio Account SID</label>
+            <input type="text" id="account_sid" placeholder="AC...">
+        </div>
+        <div class="form-group">
+            <label>Twilio Auth Token</label>
+            <input type="password" id="auth_token" placeholder="Enter Token">
+        </div>
+        <div class="form-group">
+            <label>Twilio Number (From)</label>
+            <input type="text" id="from_number" placeholder="+1....">
+        </div>
+        <div class="form-group">
+            <label>Destination Number (To)</label>
+            <input type="text" id="to_number" placeholder="+91....">
+        </div>
+        
+        <button id="triggerBtn">
+            <span id="btnText">Trigger Call</span>
+            <div id="loader" class="loader"></div>
+        </button>
+
+        <div id="response"></div>
+    </div>
+
+    <script>
+        const triggerBtn = document.getElementById('triggerBtn');
+        const btnText = document.getElementById('btnText');
+        const loader = document.getElementById('loader');
+        const responseDiv = document.getElementById('response');
+
+        // Auto-detect current host
+        if (window.location.host && !window.location.host.includes('localhost')) {
+            document.getElementById('api_url').value = window.location.origin;
+        }
+
+        triggerBtn.addEventListener('click', async () => {
+            const apiUrl = document.getElementById('api_url').value.replace(/\/$/, "");
+            const audioFile = document.getElementById('audio_file').files[0];
+            
+            const formData = new FormData();
+            formData.append('account_sid', document.getElementById('account_sid').value);
+            formData.append('auth_token', document.getElementById('auth_token').value);
+            formData.append('from_number', document.getElementById('from_number').value);
+            formData.append('to_number', document.getElementById('to_number').value);
+            
+            if (audioFile) {
+                formData.append('audio', audioFile);
+            }
+
+            if (!formData.get('account_sid') || !formData.get('auth_token') || !formData.get('from_number') || !formData.get('to_number')) {
+                alert("Please fill all required Twilio fields.");
+                return;
+            }
+
+            // Set UI to loading
+            triggerBtn.disabled = true;
+            btnText.style.display = 'none';
+            loader.style.display = 'block';
+            responseDiv.style.display = 'none';
+
+            try {
+                const response = await fetch(`${apiUrl}/make_call`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                responseDiv.style.display = 'block';
+                if (response.ok) {
+                    responseDiv.className = 'success';
+                    responseDiv.innerHTML = `<strong>Success!</strong><br>SID: ${result.call_sid}<br>${result.message}`;
+                } else {
+                    responseDiv.className = 'error';
+                    responseDiv.innerHTML = `<strong>Error!</strong><br>${result.message}`;
+                }
+            } catch (error) {
+                responseDiv.style.display = 'block';
+                responseDiv.className = 'error';
+                responseDiv.innerHTML = `<strong>Network Error!</strong><br>${error.message}`;
+            } finally {
+                triggerBtn.disabled = false;
+                btnText.style.display = 'block';
+                loader.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
